@@ -27,8 +27,8 @@ public class OcrService
 
         using (var bitmap = CaptureScreen(region))
         {
-            string fileName = $"debug_capture_{DateTime.Now:yyyyMMdd_HHmmss}.png";
-            bitmap.Save(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), fileName));
+            //string fileName = $"debug_capture_{DateTime.Now:yyyyMMdd_HHmmss}.png";
+            //bitmap.Save(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), fileName));
 
             return await Task.Run(() =>
             {

@@ -5,7 +5,13 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:translation"
         mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
+        Title="MainWindow" Height="450" Width="800"
+        
+        ShowInTaskbar="False"
+        WindowState="Minimized"
+        Visibility="Hidden"
+        >
+    <!-- 确保 Window 标签下面只有一个直接的子元素，就是这个 Grid -->
     <Grid>
 
     </Grid>

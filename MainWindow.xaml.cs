@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
-using System.IO; // 1. 引入 IO 命名空间
-using System.Reflection; // 2. 引入 Reflection 命名空间
+using System.IO;
+using System.Reflection;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
@@ -10,20 +10,17 @@ namespace translation
 {
     public partial class MainWindow : Window
     {
-        // ... (所有变量声明不变) ...
-        private GlobalMouseHook _mouseHook;
         private SelectionWindow _selectionWindow;
         private OcrService _ocrService;
         private TranslationService _translationService;
         private ResultWindow _resultWindow;
+        private HistoryService _historyService; // <-- 新增历史服务
 
         private bool isMiddleButtonDown = false;
         private Point selectionStartPoint;
 
         public MainWindow()
         {
-            // --- 这是本次修复最最核心的一步 ---
-            // 3. 在所有操作之前，强制设置底层库的搜索路径
             try
             {
                 string exeFolder = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
@@ -35,37 +32,48 @@ namespace translation
                 MessageBox.Show("设置环境变量失败: " + ex.ToString());
             }
 
-            InitializeComponent(); // 保持在设置之后
+            InitializeComponent();
 
-            this.Loaded += MainWindow_Loaded;
-            this.Closing += MainWindow_Closing;
-        }
-
-        // ... (所有其他方法保持不变) ...
-
-        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
-        {
             _selectionWindow = new SelectionWindow();
             _ocrService = new OcrService();
             _translationService = new TranslationService();
             _resultWindow = new ResultWindow();
-            _mouseHook = new GlobalMouseHook();
-            _mouseHook.MiddleButtonDown += MouseHook_MiddleButtonDown;
-            _mouseHook.MiddleButtonUp += HandleMiddleButtonUpAsync;
-            _mouseHook.MouseMove += MouseHook_MouseMove;
-            _mouseHook.Install();
+            _historyService = new HistoryService(); // <-- 初始化历史服务
+
+            this.Closing += MainWindow_Closing;
+        }
+
+        public void SubscribeToMouseHook(GlobalMouseHook mouseHook)
+        {
+            if (mouseHook != null)
+            {
+                mouseHook.MiddleButtonDown += MouseHook_MiddleButtonDown;
+                mouseHook.MiddleButtonUp += HandleMiddleButtonUpAsync;
+                mouseHook.MouseMove += MouseHook_MouseMove;
+            }
         }
 
         private void MainWindow_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
             _selectionWindow?.Close();
             _resultWindow?.Close();
-            _mouseHook?.Uninstall();
         }
 
         private Matrix GetDpiTransformMatrix()
         {
-            var source = PresentationSource.FromVisual(this);
+            PresentationSource source = null;
+            foreach (Window window in Application.Current.Windows)
+            {
+                if (window.IsVisible)
+                {
+                    source = PresentationSource.FromVisual(window);
+                    break;
+                }
+            }
+            if (source == null)
+            {
+                source = PresentationSource.FromVisual(Application.Current.MainWindow);
+            }
             return source?.CompositionTarget?.TransformToDevice ?? Matrix.Identity;
         }
 
@@ -74,12 +82,16 @@ namespace translation
             _resultWindow.Hide();
             isMiddleButtonDown = true;
             selectionStartPoint = point;
-            var transform = GetDpiTransformMatrix();
-            _selectionWindow.Left = point.X / transform.M11;
-            _selectionWindow.Top = point.Y / transform.M22;
+
             _selectionWindow.Width = 0;
             _selectionWindow.Height = 0;
             _selectionWindow.Show();
+
+            var transform = GetDpiTransformMatrix();
+            if (transform.M11 == 0 || transform.M22 == 0) return;
+
+            _selectionWindow.Left = point.X / transform.M11;
+            _selectionWindow.Top = point.Y / transform.M22;
         }
 
         private async void HandleMiddleButtonUpAsync(Point point)
@@ -100,6 +112,9 @@ namespace translation
                         _resultWindow.Left = selectionRect.Right;
                         _resultWindow.Top = selectionRect.Top;
                         _resultWindow.ShowResult(translatedText);
+
+                        // --- 核心新增：保存记录！---
+                        _historyService.AddRecord(ocrResult, translatedText);
                     }
                 }
             }
@@ -114,6 +129,7 @@ namespace translation
             if (isMiddleButtonDown)
             {
                 var transform = GetDpiTransformMatrix();
+                if (transform.M11 == 0 || transform.M22 == 0) return;
                 var x = Math.Min(point.X, selectionStartPoint.X);
                 var y = Math.Min(point.Y, selectionStartPoint.Y);
                 var width = Math.Abs(point.X - selectionStartPoint.X);
