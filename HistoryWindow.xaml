@@ -5,15 +5,54 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:translation"
         mc:Ignorable="d"
-        Title="翻译历史记录" Height="450" Width="600"
+        Title="翻译历史记录" Height="500" Width="700"
         WindowStartupLocation="CenterScreen">
-    <Grid>
-        <ListView x:Name="HistoryListView" Margin="10">
+    <Grid Margin="10">
+        <!-- 
+            核心修正 (1): 
+            我们将 GridViewColumn 的 DisplayMemberBinding 移除，
+            改用更强大的 CellTemplate (单元格模板)。
+        -->
+        <ListView x:Name="HistoryListView">
+
+            <!-- 定义 ListView 每一项的样式 -->
+            <ListView.ItemContainerStyle>
+                <Style TargetType="ListViewItem">
+                    <!-- 让列表项在水平方向上撑满整个宽度 -->
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                </Style>
+            </ListView.ItemContainerStyle>
+
             <ListView.View>
                 <GridView>
-                    <GridViewColumn Header="原文" Width="200" DisplayMemberBinding="{Binding OriginalText}"/>
-                    <GridViewColumn Header="译文" Width="200" DisplayMemberBinding="{Binding TranslatedText}"/>
-                    <GridViewColumn Header="时间" Width="150" DisplayMemberBinding="{Binding Timestamp, StringFormat='yyyy-MM-dd HH:mm:ss'}"/>
+                    <!-- 原文列 -->
+                    <GridViewColumn Header="原文" Width="280">
+                        <GridViewColumn.CellTemplate>
+                            <DataTemplate>
+                                <!-- 
+                                    核心修正 (2): 
+                                    使用一个带滚动条的、只读的 TextBox 来显示文本。
+                                    - TextWrapping="Wrap": 实现自动换行。
+                                    - IsReadOnly="True": 用户不能编辑，但可以选择和复制。
+                                    - BorderThickness="0": 去掉边框，让它看起来像一个普通的文本块。
+                                    - Background="Transparent": 透明背景。
+                                -->
+                                <TextBox Text="{Binding OriginalText}" TextWrapping="Wrap" IsReadOnly="True" BorderThickness="0" Background="Transparent" VerticalScrollBarVisibility="Auto" MaxHeight="100"/>
+                            </DataTemplate>
+                        </GridViewColumn.CellTemplate>
+                    </GridViewColumn>
+
+                    <!-- 译文列 -->
+                    <GridViewColumn Header="译文" Width="280">
+                        <GridViewColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBox Text="{Binding TranslatedText}" TextWrapping="Wrap" IsReadOnly="True" BorderThickness="0" Background="Transparent" VerticalScrollBarVisibility="Auto" MaxHeight="100"/>
+                            </DataTemplate>
+                        </GridViewColumn.CellTemplate>
+                    </GridViewColumn>
+
+                    <!-- 时间列 (保持不变，因为它通常不会很长) -->
+                    <GridViewColumn Header="时间" Width="120" DisplayMemberBinding="{Binding Timestamp, StringFormat='yyyy-MM-dd HH:mm'}"/>
                 </GridView>
             </ListView.View>
         </ListView>

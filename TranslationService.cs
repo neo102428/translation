@@ -9,88 +9,91 @@ using Newtonsoft.Json.Linq;
 
 public class TranslationService
 {
-    private const string EnvAppIdName = "20251108002493267";
-    private const string EnvSecretName = "5huyyKaOSjIldJM683aD";
-
-    private static readonly string AppId = Environment.GetEnvironmentVariable(EnvAppIdName) ?? "20251108002493267";
-    private static readonly string SecretKey = Environment.GetEnvironmentVariable(EnvSecretName) ?? "5huyyKaOSjIldJM683aD";
-
+    private readonly SettingsService _settingsService;
     private static readonly HttpClient _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
 
-    // 百度官方语言代码集合（常用）
-    private static readonly HashSet<string> Supported = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly HashSet<string> SupportedLanguages = new(StringComparer.OrdinalIgnoreCase)
     {
         "auto","zh","en","yue","wyw","jp","kor","fra","spa","th","ara","ru","pt","de","it",
-        "el","nl","pl","bul","est","dan","fin","cs","rom","slo","swe","hu","cht","vie","id","ms","tr","uk","hi"
+        "el","nl","pl","bul","est","dan","fin","cs","rom","slo","swe","hu","cht","vie"
     };
 
-    // 常见别名→百度代码
-    private static readonly Dictionary<string, string> Map = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly Dictionary<string, string> LanguageMap = new(StringComparer.OrdinalIgnoreCase)
     {
-        // 中文
-        ["zh-cn"] = "zh",
-        ["zh_cn"] = "zh",
-        ["cn"] = "zh",
-        ["zh-hans"] = "zh",
-        ["zh-tw"] = "cht",
-        ["zh_tw"] = "cht",
-        ["tw"] = "cht",
-        ["zh-hant"] = "cht",
-        ["cht"] = "cht",
-        // 英文
-        ["en-us"] = "en",
-        ["en_gb"] = "en",
-        ["en-uk"] = "en",
-        // 日/韩/法/西 等
-        ["ja"] = "jp",
-        ["jpn"] = "jp",
-        ["ko"] = "kor",
-        ["kr"] = "kor",
-        ["kor"] = "kor",
-        ["fr"] = "fra",
-        ["fre"] = "fra",
-        ["es"] = "spa",
-        ["spa"] = "spa",
-        ["pt-br"] = "pt",
-        ["pt-pt"] = "pt",
-        ["deu"] = "de",
-        ["it-it"] = "it",
-        ["vi"] = "vie",
-        ["ms-my"] = "ms",
-        ["tr-tr"] = "tr"
+        { "zh-cn", "zh" },
+        { "zh_cn", "zh" },
+        { "cn", "zh" },
+        { "zh-hans", "zh" },
+        { "zh-tw", "cht" },
+        { "zh_tw", "cht" },
+        { "tw", "cht" },
+        { "zh-hant", "cht" },
+        { "ja", "jp" },
+        { "ko", "kor" }
     };
+
+    public TranslationService(SettingsService settingsService)
+    {
+        _settingsService = settingsService;
+    }
+
+    private string NormalizeLanguageCode(string code, string defaultCode)
+    {
+        if (string.IsNullOrWhiteSpace(code)) return defaultCode;
+        string lowerCode = code.Trim().ToLowerInvariant();
+        if (LanguageMap.TryGetValue(lowerCode, out var mappedCode))
+        {
+            return mappedCode;
+        }
+        if (SupportedLanguages.Contains(lowerCode))
+        {
+            return lowerCode;
+        }
+        return defaultCode;
+    }
 
     public async Task<string> TranslateAsync(string query, string from, string to)
     {
+        string appId = _settingsService.Settings.BaiduAppId;
+        string secretKey = _settingsService.Settings.BaiduSecretKey;
+
         if (string.IsNullOrWhiteSpace(query)) return "要翻译的文本为空";
-        if (AppId.StartsWith("请配置") || SecretKey.StartsWith("请配置"))
-            return $"请配置百度API密钥（在环境变量 {EnvAppIdName} / {EnvSecretName} 中设置 AppId 与 Secret）";
+        if (string.IsNullOrWhiteSpace(appId) || string.IsNullOrWhiteSpace(secretKey))
+        {
+            return "错误：API 密钥未配置。\n请右键点击托盘图标，进入“设置”页面配置您的百度翻译密钥。";
+        }
 
-        // 规范化语言代码
-        string fromCode = NormalizeFrom(from);
-        string toCode = NormalizeTo(to);
+        string fromCode = NormalizeLanguageCode(from, "auto");
+        string toCode = NormalizeLanguageCode(to, "zh");
 
-        if (!Supported.Contains(toCode) || toCode.Equals("auto", StringComparison.OrdinalIgnoreCase))
-            return $"目标语言不合法：{to}. 请选择：{string.Join(",", Supported)}（除 auto 外）";
+        if (toCode == "auto")
+        {
+            return "错误：目标翻译语言不能设置为“自动检测”。";
+        }
+
+        // --- 核心修正：清理查询文本中的换行符 ---
+        // 将所有换行符 (\n) 和回车符 (\r) 都替换成一个空格
+        string cleanedQuery = query.Replace("\r\n", " ").Replace("\n", " ").Replace("\r", " ");
+
+        string salt = new Random().Next(100000, 999999).ToString();
+        // 使用清理后的文本进行签名
+        string sign = GetMd5Hash(appId + cleanedQuery + salt + secretKey);
+
+        var content = new FormUrlEncodedContent(new[]
+        {
+            // 提交给 API 的也是清理后的文本
+            new KeyValuePair<string,string>("q", cleanedQuery),
+            new KeyValuePair<string,string>("from", fromCode),
+            new KeyValuePair<string,string>("to", toCode),
+            new KeyValuePair<string,string>("appid", appId),
+            new KeyValuePair<string,string>("salt", salt),
+            new KeyValuePair<string,string>("sign", sign)
+        });
 
         try
         {
-            string salt = new Random().Next(100000, 999999).ToString();
-            string sign = GetMd5Hash(AppId + query + salt + SecretKey);
-
-            var content = new FormUrlEncodedContent(new[]
-            {
-                new KeyValuePair<string,string>("q", query),        // 注意：签名用原文，提交表单即可
-                new KeyValuePair<string,string>("from", fromCode),
-                new KeyValuePair<string,string>("to", toCode),
-                new KeyValuePair<string,string>("appid", AppId),
-                new KeyValuePair<string,string>("salt", salt),
-                new KeyValuePair<string,string>("sign", sign)
-            });
-
             var response = await _httpClient.PostAsync("https://api.fanyi.baidu.com/api/trans/vip/translate", content);
             var jsonResult = await response.Content.ReadAsStringAsync();
-            Debug.WriteLine("百度翻译原始返回: " + jsonResult);
 
             var jsonResponse = JObject.Parse(jsonResult);
             if (jsonResponse["error_code"] != null)
@@ -98,17 +101,9 @@ public class TranslationService
                 string code = jsonResponse["error_code"]?.ToString();
                 string msg = jsonResponse["error_msg"]?.ToString();
 
-                if (code == "58001") // 你的当前报错
-                    return $"百度翻译错误 (代码: {code})：{msg}。已将 to={to} 规范化为 {toCode}，请确认在支持列表内。";
-
-                if (code == "52003")
-                    return $"百度翻译错误 (代码: {code})：{msg}。请在百度开放平台检查该 App 的服务授权、来源限制和账号状态。";
-
-                if (code == "58000" || code == "54003")
+                if (code == "58000")
                 {
-                    string clientIp = jsonResponse["data"]?["client_ip"]?.ToString()
-                                   ?? jsonResponse["client_ip"]?.ToString();
-                    return $"百度翻译错误 (代码: {code})：{msg}。client_ip={clientIp ?? "未知"}。";
+                    return $"百度翻译错误 (代码: 58000)：客户端 IP 非法。\n\n请确保您已在百度翻译后台关闭“IP 地址校验”功能。";
                 }
 
                 return $"百度翻译错误 (代码: {code})：{msg}";
@@ -118,22 +113,6 @@ public class TranslationService
         }
         catch (HttpRequestException hx) { return "网络请求失败: " + hx.Message; }
         catch (Exception ex) { return "翻译接口调用失败: " + ex.Message; }
-    }
-
-    private static string NormalizeFrom(string s)
-    {
-        if (string.IsNullOrWhiteSpace(s)) return "auto";
-        s = s.Trim();
-        if (Map.TryGetValue(s, out var v)) return v;
-        return Supported.Contains(s) ? s.ToLowerInvariant() : "auto";
-    }
-
-    private static string NormalizeTo(string s)
-    {
-        if (string.IsNullOrWhiteSpace(s)) return "zh"; // 缺省翻译成中文
-        s = s.Trim();
-        if (Map.TryGetValue(s, out var v)) return v;
-        return Supported.Contains(s) ? s.ToLowerInvariant() : s.ToLowerInvariant(); // 让上层校验报错
     }
 
     private static string GetMd5Hash(string input)

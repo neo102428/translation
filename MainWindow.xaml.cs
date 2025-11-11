@@ -10,38 +10,42 @@ namespace translation
 {
     public partial class MainWindow : Window
     {
+        // 字段声明移到 App.xaml.cs 统一管理，这里不再需要
+        // 但为了接收实例，我们暂时保留
         private SelectionWindow _selectionWindow;
         private OcrService _ocrService;
         private TranslationService _translationService;
         private ResultWindow _resultWindow;
-        private HistoryService _historyService; // <-- 新增历史服务
+        private HistoryService _historyService;
 
         private bool isMiddleButtonDown = false;
         private Point selectionStartPoint;
 
         public MainWindow()
         {
-            try
-            {
-                string exeFolder = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-                string path = Environment.GetEnvironmentVariable("PATH");
-                Environment.SetEnvironmentVariable("PATH", $"{exeFolder}\\x64;{path}");
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("设置环境变量失败: " + ex.ToString());
-            }
-
+            // 构造函数现在非常干净，只负责UI初始化
             InitializeComponent();
+        }
 
-            _selectionWindow = new SelectionWindow();
-            _ocrService = new OcrService();
-            _translationService = new TranslationService();
-            _resultWindow = new ResultWindow();
-            _historyService = new HistoryService(); // <-- 初始化历史服务
+        // 新增一个初始化方法，由 App.xaml.cs 调用
+        public void InitializeServices(
+            SettingsService settingsService,
+            SelectionWindow selectionWindow,
+            OcrService ocrService,
+            ResultWindow resultWindow,
+            HistoryService historyService)
+        {
+            _selectionWindow = selectionWindow;
+            _ocrService = ocrService;
+            _resultWindow = resultWindow;
+            _historyService = historyService;
+            // TranslationService 依赖 settingsService，单独创建
+            _translationService = new TranslationService(settingsService);
 
+            // 将 Closing 事件移到这里，确保在服务初始化后再订阅
             this.Closing += MainWindow_Closing;
         }
+
 
         public void SubscribeToMouseHook(GlobalMouseHook mouseHook)
         {
@@ -55,9 +59,12 @@ namespace translation
 
         private void MainWindow_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
+            // 关闭由 App 类管理的窗口
             _selectionWindow?.Close();
             _resultWindow?.Close();
         }
+
+        // ... 以下所有方法完全保持不变 ...
 
         private Matrix GetDpiTransformMatrix()
         {
@@ -109,11 +116,17 @@ namespace translation
                     string translatedText = await _translationService.TranslateAsync(ocrResult, "auto", "zh-CN");
                     if (!string.IsNullOrWhiteSpace(translatedText))
                     {
+                        // --- 核心修改：分步调用 ResultWindow 的新方法 ---
+
+                        // 1. 先设置好窗口的初始位置和要显示的文本
                         _resultWindow.Left = selectionRect.Right;
                         _resultWindow.Top = selectionRect.Top;
-                        _resultWindow.ShowResult(translatedText);
+                        _resultWindow.SetResultText(translatedText); // 使用新方法设置文本
 
-                        // --- 核心新增：保存记录！---
+                        // 2. 然后调用新的显示方法，它会自己处理位置调整和自动关闭
+                        _resultWindow.ShowAndAutoHide();
+
+                        // 保存记录的逻辑保持不变
                         _historyService.AddRecord(ocrResult, translatedText);
                     }
                 }
