@@ -1,8 +1,6 @@
 ﻿using System.IO;
 using Newtonsoft.Json;
 
-// --- 1. 新增：在文件顶部定义触发方式的枚举 ---
-// 把它放在这里，可以让其他文件（如 MainWindow, SettingsWindow）也能访问到
 public enum TriggerMode
 {
     MiddleMouse,
@@ -14,8 +12,12 @@ public class AppSettings
 {
     public string BaiduAppId { get; set; } = string.Empty;
     public string BaiduSecretKey { get; set; } = string.Empty;
-    // --- 2. 新增：在设置类中添加一个字段来保存用户的选择 ---
-    public TriggerMode Trigger { get; set; } = TriggerMode.MiddleMouse; // 默认是中键
+    public TriggerMode Trigger { get; set; } = TriggerMode.MiddleMouse;
+
+    // --- 核心新增：保存用户选择的语言 ---
+    // 百度API代码：auto, zh, en, jp, kor
+    public string SourceLanguage { get; set; } = "auto";
+    public string TargetLanguage { get; set; } = "zh";
 }
 
 public class SettingsService

@@ -39,6 +39,11 @@
 	</ItemGroup>
 
 	<ItemGroup>
+	  <None Remove="tessdata\jpn.traineddata" />
+	  <None Remove="tessdata\kor.traineddata" />
+	</ItemGroup>
+
+	<ItemGroup>
 	  <None Update="tessdata\chi_sim.traineddata">
 	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 	  </None>

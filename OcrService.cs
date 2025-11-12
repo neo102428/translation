@@ -2,7 +2,6 @@
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
-using System.Reflection;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Interop;
@@ -11,30 +10,48 @@ using Tesseract;
 
 public class OcrService
 {
-    // 使用硬编码的、最不可能出错的路径
     private const string TessDataPath = @"C:\TesseractData";
 
-    // --- 修正：将 O-crService 改回 OcrService ---
     public OcrService()
     {
-        // 确保目录存在，以防万一
         Directory.CreateDirectory(TessDataPath);
     }
 
-    public async Task<string> RecognizeTextAsync(System.Windows.Rect region)
+    // --- 核心修改 (1): 方法现在接收一个 language 参数 ---
+    public async Task<string> RecognizeTextAsync(System.Windows.Rect region, string language)
     {
         if (region.Width <= 0 || region.Height <= 0) return string.Empty;
 
+        // --- 核心修改 (2): 根据 language 参数决定加载哪些 OCR 模型 ---
+        string ocrLanguages;
+        switch (language?.ToLower())
+        {
+            case "zh":
+                ocrLanguages = "chi_sim+eng";
+                break;
+            case "jp":
+                ocrLanguages = "jpn+eng";
+                break;
+            case "en":
+                ocrLanguages = "eng";
+                break;
+            case "kor":
+                ocrLanguages = "kor";
+                break;
+            case "auto":
+            default:
+                ocrLanguages = "chi_sim+eng+jpn+kor";
+                break;
+        }
+
         using (var bitmap = CaptureScreen(region))
         {
-            //string fileName = $"debug_capture_{DateTime.Now:yyyyMMdd_HHmmss}.png";
-            //bitmap.Save(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), fileName));
-
             return await Task.Run(() =>
             {
                 try
                 {
-                    using (var engine = new TesseractEngine(TessDataPath, "chi_sim+eng", EngineMode.Default))
+                    // --- 核心修改 (3): 使用动态计算出的 ocrLanguages ---
+                    using (var engine = new TesseractEngine(TessDataPath, ocrLanguages, EngineMode.Default))
                     {
                         using (var ms = new MemoryStream())
                         {
@@ -52,7 +69,11 @@ public class OcrService
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show("OCR 识别出错: " + ex.ToString());
+                    string errorMessage = $"OCR 引擎初始化失败！\n\n" +
+                                          $"请确保在 C:\\TesseractData 文件夹中，\n" +
+                                          $"已放入所需的语言文件 (例如: '{ocrLanguages.Split('+')[0]}.traineddata')。\n\n" +
+                                          $"详细错误: {ex.Message}";
+                    MessageBox.Show(errorMessage, "OCR 错误");
                     return string.Empty;
                 }
             });
