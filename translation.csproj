@@ -38,4 +38,13 @@
 		</Content>
 	</ItemGroup>
 
+	<ItemGroup>
+	  <None Update="tessdata\chi_sim.traineddata">
+	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  </None>
+	  <None Update="tessdata\eng.traineddata">
+	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  </None>
+	</ItemGroup>
+
 </Project>

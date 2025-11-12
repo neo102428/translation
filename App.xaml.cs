@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading; // <-- 1. 引入线程处理所需的命名空间
 using System.Windows;
 using System.Windows.Controls;
 using Hardcodet.Wpf.TaskbarNotification;
@@ -7,44 +8,56 @@ namespace translation
 {
     public partial class App : Application
     {
-        // 将所有核心对象作为 App 类的字段，由 App 统一管理生命周期
+        // --- 2. 核心新增：定义一个全局的、唯一的 Mutex ---
+        private static Mutex _mutex = null;
+
+        // ... 其他所有字段保持不变 ...
         private TaskbarIcon _notifyIcon;
         private GlobalMouseHook _mouseHook;
-
-        // 服务
         private SettingsService _settingsService;
         private HistoryService _historyService;
         private OcrService _ocrService;
-
-        // 窗口
         private MainWindow _mainWindow;
         private SettingsWindow _settingsWindow;
         private HistoryWindow _historyWindow;
         private SelectionWindow _selectionWindow;
         private ResultWindow _resultWindow;
 
-
         protected override void OnStartup(StartupEventArgs e)
         {
+            // --- 3. 核心新增：在所有操作之前，进行单例检查 ---
+
+            // 创建一个唯一的、全局的应用程序名称
+            const string appName = "Global\\TranslationTool_Mutex_2A8A2E8D_8B4E_4C4F_A8D7_3B6C9B0E1F2A";
+            bool createdNew;
+
+            // 尝试创建并获取 Mutex
+            _mutex = new Mutex(true, appName, out createdNew);
+
+            if (!createdNew)
+            {
+                // 如果 createdNew 是 false，意味着 Mutex 已经存在，说明已有实例在运行
+                MessageBox.Show("划词翻译工具已经在运行中！\n\n请在屏幕右下角的托盘区找到它的图标。", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+
+                // 立即关闭当前这个（第二个）实例
+                Application.Current.Shutdown();
+                return; // 必须 return，以阻止后续代码的执行
+            }
+
+            // --- 如果是第一个实例，则正常执行所有启动逻辑 ---
+
             base.OnStartup(e);
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
-            // --- 保证正确的初始化顺序 ---
-
-            // 1. 先创建所有后台服务和工具窗口的实例
             _settingsService = new SettingsService();
             _historyService = new HistoryService();
             _ocrService = new OcrService();
             _selectionWindow = new SelectionWindow();
             _resultWindow = new ResultWindow();
 
-            // 2. 创建主逻辑窗口（但它依然是隐藏的）
             _mainWindow = new MainWindow();
-            // 将所有需要的服务实例传递给主窗口
             _mainWindow.InitializeServices(_settingsService, _selectionWindow, _ocrService, _resultWindow, _historyService);
 
-            // 3. 在所有窗口都创建完毕后，最后创建托盘图标
-            // 这个顺序可以最大限度地避免“两个图标”的bug
             _notifyIcon = new TaskbarIcon();
             _notifyIcon.ToolTipText = "划词翻译工具";
             _notifyIcon.IconSource = new System.Windows.Media.Imaging.BitmapImage(new Uri("pack://application:,,,/translation.ico"));
@@ -67,13 +80,15 @@ namespace translation
 
             _notifyIcon.ContextMenu = contextMenu;
 
-            // 4. 最后，启动后台监听
             _mouseHook = new GlobalMouseHook();
             _mouseHook.Install();
             _mainWindow.SubscribeToMouseHook(_mouseHook);
+
+            // --- (可选但推荐) 首次启动时给一个提示 ---
+            _notifyIcon.ShowBalloonTip("程序已启动", "划词翻译工具已在后台运行。", BalloonIcon.Info);
         }
 
-        // ... 以下所有方法完全保持不变 ...
+        // ... 其他所有方法完全保持不变 ...
 
         private void SettingsMenuItem_Click(object sender, RoutedEventArgs e)
         {
@@ -104,19 +119,19 @@ namespace translation
 
         private void ExitMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            // 关闭所有窗口
             _mainWindow?.Close();
             _settingsWindow?.Close();
             _historyWindow?.Close();
-            // 彻底关闭程序
             Shutdown();
         }
 
         protected override void OnExit(ExitEventArgs e)
         {
-            // 确保所有资源都被释放
             _notifyIcon?.Dispose();
             _mouseHook?.Dispose();
+            // 确保在程序退出时释放 Mutex
+            _mutex?.ReleaseMutex();
+            _mutex?.Dispose();
             base.OnExit(e);
         }
     }
