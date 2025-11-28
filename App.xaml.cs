@@ -16,10 +16,9 @@ namespace translation
         [DllImport("shcore.dll")]
         private static extern int SetProcessDpiAwareness(int value);
 
-        // --- 2. 核心新增：定义一个全局的、唯一的 Mutex ---
         private static Mutex _mutex = null;
+        private static bool _mutexOwned = false; // 标记是否拥有 Mutex
 
-        // ... 其他所有字段保持不变 ...
         private TaskbarIcon _notifyIcon;
         private GlobalMouseHook _mouseHook;
         private SettingsService _settingsService;
@@ -54,27 +53,29 @@ namespace translation
 
             try
             {
-                // --- 3. 核心新增：在所有操作之前，进行单例检查 ---
-
-                // 创建一个唯一的、全局的应用程序名称
+                // 单例检查
                 const string appName = "Global\\TranslationTool_Mutex_2A8A2E8D_8B4E_4C4F_A8D7_3B6C9B0E1F2A";
                 bool createdNew;
 
-                // 尝试创建并获取 Mutex
                 _mutex = new Mutex(true, appName, out createdNew);
+                _mutexOwned = createdNew; // 记录是否拥有 Mutex
 
                 if (!createdNew)
                 {
-                    // 如果 createdNew 是 false，意味着 Mutex 已经存在，说明已有实例在运行
-                    MessageBox.Show("划词翻译工具已经在运行中！\n\n请在屏幕右下角的托盘区找到它的图标。", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
-
-                    // 立即关闭当前这个（第二个）实例
+                    // 如果已有实例在运行，提示用户并退出
+                    MessageBox.Show("划词翻译工具已经在运行中！\n\n请在屏幕右下角的托盘区找到它的图标。", 
+                        "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+                    
+                    // 清理 Mutex（不释放，因为我们不拥有它）
+                    _mutex?.Close();
+                    _mutex = null;
+                    
+                    // 退出应用程序
                     Application.Current.Shutdown();
-                    return; // 必须 return，以阻止后续代码的执行
+                    return;
                 }
 
-                // --- 如果是第一个实例，则正常执行所有启动逻辑 ---
-
+                // 如果是第一个实例，正常启动
                 base.OnStartup(e);
                 ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
@@ -154,8 +155,6 @@ namespace translation
             }
         }
 
-        // ... 其他所有方法完全保持不变 ...
-
         private void SettingsMenuItem_Click(object sender, RoutedEventArgs e)
         {
             if (_settingsWindow != null && _settingsWindow.IsVisible)
@@ -178,7 +177,6 @@ namespace translation
             }
             else
             {
-                // --- 核心修正：创建窗口时，把 HistoryService 传进去 ---
                 _historyWindow = new HistoryWindow(_historyService);
                 _historyWindow.ShowHistory(_historyService.GetHistory());
                 _historyWindow.Show();
@@ -197,9 +195,23 @@ namespace translation
         {
             _notifyIcon?.Dispose();
             _mouseHook?.Dispose();
-            // 确保在程序退出时释放 Mutex
-            _mutex?.ReleaseMutex();
+            
+            // 只有当我们拥有 Mutex 时才释放它
+            if (_mutexOwned && _mutex != null)
+            {
+                try
+                {
+                    _mutex.ReleaseMutex();
+                }
+                catch
+                {
+                    // 忽略释放错误
+                }
+            }
+            
+            // 总是 Dispose Mutex
             _mutex?.Dispose();
+            
             base.OnExit(e);
         }
     }
