@@ -1,7 +1,8 @@
 ﻿using System;
 using System.Windows;
-using System.Windows.Controls; // <-- 核心修正：添加这一行 using 声明
+using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Threading;
 
 namespace translation
@@ -9,6 +10,7 @@ namespace translation
     public partial class ResultWindow : Window
     {
         private DispatcherTimer _closeTimer;
+        private ThemeMode _currentTheme = ThemeMode.Dark;
 
         public ResultWindow()
         {
@@ -30,7 +32,22 @@ namespace translation
             ResultTextBox.Text = text;
         }
 
-
+        public void ApplyTheme(ThemeMode theme)
+        {
+            _currentTheme = theme;
+            if (theme == ThemeMode.Light)
+            {
+                RootBorder.Background = new SolidColorBrush(Color.FromArgb(221, 255, 255, 255));
+                ResultTextBox.Foreground = new SolidColorBrush(Colors.Black);
+                ResultTextBox.CaretBrush = new SolidColorBrush(Colors.Black);
+            }
+            else
+            {
+                RootBorder.Background = new SolidColorBrush(Color.FromArgb(221, 0, 0, 0));
+                ResultTextBox.Foreground = new SolidColorBrush(Colors.White);
+                ResultTextBox.CaretBrush = new SolidColorBrush(Colors.White);
+            }
+        }
 
         public void ShowAndAutoHide()
         {
@@ -85,14 +102,11 @@ namespace translation
 
         private void Border_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            // 检查用户是否在 TextBox 上点击以选择文本
-            // 如果是，则不触发拖动
             if (e.OriginalSource is TextBox)
             {
                 return;
             }
 
-            // 如果用户点击的是窗口的其他部分（比如边距），则开始拖动
             this.DragMove();
         }
     }

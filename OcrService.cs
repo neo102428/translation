@@ -7,23 +7,72 @@ using System.Threading.Tasks;
 using System.Windows;
 using Tesseract;
 using Application = System.Windows.Application;
-using Matrix = System.Windows.Media.Matrix;
-using PresentationSource = System.Windows.PresentationSource;
 
 public class OcrService
 {
-    private const string TessDataPath = @"C:\TesseractData";
+    private readonly string TessDataPath;
 
     public OcrService()
     {
-        Directory.CreateDirectory(TessDataPath);
+        // 优先使用程序目录下的 tessdata，如果不存在则使用 C 盘
+        string localTessData = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tessdata");
+        
+        if (Directory.Exists(localTessData) && HasTrainedDataFiles(localTessData))
+        {
+            TessDataPath = localTessData;
+        }
+        else
+        {
+            TessDataPath = @"C:\TesseractData";
+            Directory.CreateDirectory(TessDataPath);
+            
+            // 如果 C 盘目录为空，尝试从本地复制
+            if (!HasTrainedDataFiles(TessDataPath) && Directory.Exists(localTessData))
+            {
+                CopyTessDataFiles(localTessData, TessDataPath);
+            }
+        }
     }
 
-    public async Task<string> RecognizeTextAsync(System.Windows.Rect region, string language)
+    private bool HasTrainedDataFiles(string path)
     {
-        if (region.Width <= 0 || region.Height <= 0) return string.Empty;
+        if (!Directory.Exists(path)) return false;
+        var files = Directory.GetFiles(path, "*.traineddata");
+        return files.Length > 0;
+    }
 
-        using (var originalBitmap = CaptureScreen(region))
+    private void CopyTessDataFiles(string sourcePath, string destPath)
+    {
+        try
+        {
+            Directory.CreateDirectory(destPath);
+            foreach (string file in Directory.GetFiles(sourcePath, "*.traineddata"))
+            {
+                string fileName = Path.GetFileName(file);
+                string destFile = Path.Combine(destPath, fileName);
+                if (!File.Exists(destFile))
+                {
+                    File.Copy(file, destFile, false);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            // 复制失败不影响程序运行，后续会有错误提示
+            System.Diagnostics.Debug.WriteLine($"复制 tessdata 文件失败: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 识别文本 - 接收屏幕像素坐标
+    /// </summary>
+    /// <param name="screenRect">屏幕像素坐标（已经考虑 DPI 缩放）</param>
+    /// <param name="language">语言代码</param>
+    public async Task<string> RecognizeTextAsync(System.Windows.Rect screenRect, string language)
+    {
+        if (screenRect.Width <= 0 || screenRect.Height <= 0) return string.Empty;
+
+        using (var originalBitmap = CaptureScreenDirect(screenRect))
         {
             if (originalBitmap == null) return string.Empty;
 
@@ -65,7 +114,6 @@ public class OcrService
                 {
                     using (var ms = new MemoryStream())
                     {
-                        // --- 核心修正：明确指定 System.Drawing.Imaging.ImageFormat ---
                         imageToProcess.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
                         using (var pix = Pix.LoadFromMemory(ms.ToArray()))
                         {
@@ -93,25 +141,46 @@ public class OcrService
     {
         if (bmp == null || bmp.Width < 10 || bmp.Height < 10) return false;
 
-        long totalBrightness = 0;
-        int sampleCount = 0;
-        int step = Math.Max(1, Math.Min(bmp.Width, bmp.Height) / 20);
-
-        for (int y = 0; y < bmp.Height; y += step)
+        BitmapData data = null;
+        try
         {
-            for (int x = 0; x < bmp.Width; x += step)
+            data = bmp.LockBits(
+                new Rectangle(0, 0, bmp.Width, bmp.Height),
+                ImageLockMode.ReadOnly,
+                bmp.PixelFormat);
+
+            int bytesPerPixel = Image.GetPixelFormatSize(bmp.PixelFormat) / 8;
+            if (bytesPerPixel < 3) return false;
+
+            long totalBrightness = 0;
+            int sampleCount = 0;
+            int step = Math.Max(1, Math.Min(bmp.Width, bmp.Height) / 20);
+
+            unsafe
             {
-                Color pixel = bmp.GetPixel(x, y);
-                totalBrightness += pixel.R + pixel.G + pixel.B;
-                sampleCount++;
+                byte* ptr = (byte*)data.Scan0;
+                for (int y = 0; y < bmp.Height; y += step)
+                {
+                    for (int x = 0; x < bmp.Width; x += step)
+                    {
+                        int index = y * data.Stride + x * bytesPerPixel;
+                        totalBrightness += ptr[index] + ptr[index + 1] + ptr[index + 2];
+                        sampleCount++;
+                    }
+                }
+            }
+
+            if (sampleCount == 0) return false;
+            double averageBrightness = (double)totalBrightness / (sampleCount * 3);
+            return averageBrightness < 128;
+        }
+        finally
+        {
+            if (data != null)
+            {
+                bmp.UnlockBits(data);
             }
         }
-
-        if (sampleCount == 0) return false;
-
-        double averageBrightness = (double)totalBrightness / (sampleCount * 3);
-
-        return averageBrightness < 128;
     }
 
     private Bitmap InvertBitmap(Bitmap source)
@@ -127,8 +196,8 @@ public class OcrService
             {
                 source.UnlockBits(sourceData);
                 invertedImage.UnlockBits(destData);
-                invertedImage.Dispose(); // 释放新创建的 bitmap
-                return source; // 不是彩色图，直接返回原图
+                invertedImage.Dispose();
+                return source;
             }
             int byteCount = sourceData.Stride * source.Height;
             byte[] pixels = new byte[byteCount];
@@ -152,44 +221,27 @@ public class OcrService
         return invertedImage;
     }
 
-    private Bitmap CaptureScreen(System.Windows.Rect region)
+    /// <summary>
+    /// 直接截取屏幕 - 接收屏幕像素坐标，不进行 DPI 转换
+    /// </summary>
+    private Bitmap CaptureScreenDirect(System.Windows.Rect screenRect)
     {
-        PresentationSource source = PresentationSource.FromVisual(Application.Current.MainWindow);
-        if (source == null)
-        {
-            foreach (Window win in Application.Current.Windows)
-            {
-                if (win.IsVisible)
-                {
-                    source = PresentationSource.FromVisual(win);
-                    break;
-                }
-            }
+        // 将坐标转换为整数像素
+        int x = (int)Math.Round(screenRect.X);
+        int y = (int)Math.Round(screenRect.Y);
+        int width = (int)Math.Round(screenRect.Width);
+        int height = (int)Math.Round(screenRect.Height);
+
+        if (width <= 0 || height <= 0) 
+        { 
+            return new Bitmap(1, 1); 
         }
 
-        Matrix transform;
-        if (source?.CompositionTarget != null)
-        {
-            transform = source.CompositionTarget.TransformToDevice;
-        }
-        else
-        {
-            using (var src = new System.Windows.Interop.HwndSource(new System.Windows.Interop.HwndSourceParameters()))
-            {
-                transform = src.CompositionTarget.TransformToDevice;
-            }
-        }
-
-        var topLeft = transform.Transform(region.TopLeft);
-        var bottomRight = transform.Transform(region.BottomRight);
-        var pixelRect = new Rectangle((int)topLeft.X, (int)topLeft.Y, (int)Math.Abs(bottomRight.X - topLeft.X), (int)Math.Abs(bottomRight.Y - topLeft.Y));
-
-        if (pixelRect.Width <= 0 || pixelRect.Height <= 0) { return new Bitmap(1, 1); }
-
-        var bmp = new Bitmap(pixelRect.Width, pixelRect.Height, PixelFormat.Format32bppArgb);
+        var bmp = new Bitmap(width, height, PixelFormat.Format32bppArgb);
         using (var g = Graphics.FromImage(bmp))
         {
-            g.CopyFromScreen(pixelRect.X, pixelRect.Y, 0, 0, bmp.Size, CopyPixelOperation.SourceCopy);
+            // 直接使用传入的屏幕坐标截图
+            g.CopyFromScreen(x, y, 0, 0, new System.Drawing.Size(width, height), CopyPixelOperation.SourceCopy);
         }
         return bmp;
     }

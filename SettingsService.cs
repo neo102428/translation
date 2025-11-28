@@ -8,16 +8,44 @@ public enum TriggerMode
     AltAndLeftMouse
 }
 
+public enum ThemeMode
+{
+    Light,
+    Dark
+}
+
+public enum TranslationEngine
+{
+    Baidu,      // 百度翻译
+    Tencent,    // 腾讯翻译
+    Google      // 谷歌翻译
+}
+
 public class AppSettings
 {
+    // 翻译引擎选择
+    public TranslationEngine Engine { get; set; } = TranslationEngine.Baidu;
+    
+    // 百度翻译配置
     public string BaiduAppId { get; set; } = string.Empty;
     public string BaiduSecretKey { get; set; } = string.Empty;
+    
+    // 腾讯翻译配置
+    public string TencentSecretId { get; set; } = string.Empty;
+    public string TencentSecretKey { get; set; } = string.Empty;
+    
+    // 谷歌翻译配置
+    public string GoogleApiKey { get; set; } = string.Empty;
+    
+    // 触发方式
     public TriggerMode Trigger { get; set; } = TriggerMode.MiddleMouse;
 
-    // --- 核心新增：保存用户选择的语言 ---
-    // 百度API代码：auto, zh, en, jp, kor
+    // 语言设置
     public string SourceLanguage { get; set; } = "auto";
     public string TargetLanguage { get; set; } = "zh";
+    
+    // 主题模式
+    public ThemeMode Theme { get; set; } = ThemeMode.Dark;
 }
 
 public class SettingsService

@@ -4,69 +4,395 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
-        Title="设置" Height="450" Width="450"
-        WindowStartupLocation="CenterScreen" ResizeMode="NoResize">
-    <Grid Margin="15">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
+        Title="设置" Height="650" Width="560"
+        WindowStartupLocation="CenterScreen" 
+        ResizeMode="NoResize"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        TextOptions.TextFormattingMode="Display"
+        TextOptions.TextRenderingMode="ClearType"
+        RenderOptions.BitmapScalingMode="HighQuality"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True">
+    
+    <Window.Resources>
+        <!-- 现代化文本框样式 -->
+        <Style x:Key="ModernTextBox" TargetType="TextBox">
+            <Setter Property="Padding" Value="12,10"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="#E0E0E0"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="Foreground" Value="#333333"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6">
+                            <ScrollViewer x:Name="PART_ContentHost" Margin="2"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsFocused" Value="True">
+                                <Setter Property="BorderBrush" Value="#4A90E2"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
 
-        <!-- API 设置部分 -->
-        <GroupBox Header="API 设置" Grid.Row="0">
-            <StackPanel Margin="10">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="百度翻译 App ID:" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                    <TextBox x:Name="AppIdTextBox" Grid.Column="1" VerticalAlignment="Center" Padding="2"/>
+        <!-- 现代化单选按钮样式 -->
+        <Style x:Key="ModernRadioButton" TargetType="RadioButton">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Foreground" Value="#555555"/>
+            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+
+        <!-- 现代化组合框样式 -->
+        <Style x:Key="ModernComboBox" TargetType="ComboBox">
+            <Setter Property="Padding" Value="10,8"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="#E0E0E0"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <Border Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="6">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <ContentPresenter x:Name="ContentSite"
+                                                      Content="{TemplateBinding SelectionBoxItem}"
+                                                      ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                                      Margin="{TemplateBinding Padding}"
+                                                      VerticalAlignment="Center"
+                                                      HorizontalAlignment="Left"/>
+                                    <ToggleButton Grid.Column="1" 
+                                                  IsChecked="{Binding Path=IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                                  ClickMode="Press"
+                                                  Focusable="False"
+                                                  Background="Transparent"
+                                                  BorderThickness="0"
+                                                  Width="30">
+                                        <Path Data="M 0 0 L 4 4 L 8 0 Z" Fill="#666666" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </ToggleButton>
+                                </Grid>
+                            </Border>
+                            <Popup x:Name="Popup"
+                                   Placement="Bottom"
+                                   IsOpen="{TemplateBinding IsDropDownOpen}"
+                                   AllowsTransparency="True"
+                                   Focusable="False"
+                                   PopupAnimation="Slide">
+                                <Border Background="White" BorderBrush="#E0E0E0" BorderThickness="1" CornerRadius="6" Margin="0,4,0,0">
+                                    <ScrollViewer MaxHeight="200">
+                                        <ItemsPresenter/>
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="BorderBrush" Value="#4A90E2"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 主按钮样式 -->
+        <Style x:Key="PrimaryButton" TargetType="Button">
+            <Setter Property="Background" Value="#4A90E2"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Padding" Value="24,12"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="8"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#3A7BC8"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Background" Value="#2A6AB8"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 关闭按钮样式 -->
+        <Style x:Key="CloseButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#999999"/>
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="Width" Value="32"/>
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="16">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#F0F0F0"/>
+                                <Setter Property="Foreground" Value="#333333"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Border Background="White" CornerRadius="12" Margin="10">
+        <Border.Effect>
+            <DropShadowEffect Color="Black" BlurRadius="20" ShadowDepth="0" Opacity="0.3"/>
+        </Border.Effect>
+
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- 标题栏 -->
+            <Border Grid.Row="0" Background="White" CornerRadius="12,12,0,0" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                <Grid Height="56" Margin="24,0">
+                    <TextBlock Text="⚙️ 设置" 
+                               FontSize="20" 
+                               FontWeight="Bold" 
+                               Foreground="#333333"
+                               VerticalAlignment="Center"/>
+                    <Button Style="{StaticResource CloseButton}"
+                            Content="✕"
+                            HorizontalAlignment="Right"
+                            Click="CloseButton_Click"/>
                 </Grid>
-                <Grid Margin="0,10,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="百度翻译 Secret Key:" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                    <TextBox x:Name="SecretKeyTextBox" Grid.Column="1" VerticalAlignment="Center" Padding="2"/>
-                </Grid>
-            </StackPanel>
-        </GroupBox>
+            </Border>
 
-        <!-- 触发方式设置部分 -->
-        <GroupBox Header="触发方式设置" Grid.Row="1" Margin="0,10,0,0">
-            <StackPanel Margin="10">
-                <RadioButton x:Name="MiddleMouseRadio" Content="按住鼠标中键拖动" IsChecked="True"/>
-                <RadioButton x:Name="RightMouseRadio" Content="按住鼠标右键拖动" Margin="0,5,0,0"/>
-                <RadioButton x:Name="AltLeftMouseRadio" Content="按住 Alt + 鼠标左键拖动" Margin="0,5,0,0"/>
-            </StackPanel>
-        </GroupBox>
+            <!-- 内容区域 -->
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="24,12,24,12">
+                <StackPanel>
+                    <!-- 翻译引擎选择 -->
+                    <Border Background="#F8F9FA" CornerRadius="8" Padding="20" Margin="0,0,0,16">
+                        <StackPanel>
+                            <TextBlock Text="🌐 翻译引擎" 
+                                       FontSize="15" 
+                                       FontWeight="SemiBold" 
+                                       Foreground="#333333"
+                                       Margin="0,0,0,12"/>
+                            
+                            <RadioButton x:Name="BaiduRadio" 
+                                         Content="百度翻译 (Baidu)" 
+                                         Style="{StaticResource ModernRadioButton}"
+                                         GroupName="Engine"
+                                         IsChecked="True"
+                                         Checked="EngineRadio_Checked"
+                                         Margin="0,0,0,8"/>
+                            <RadioButton x:Name="TencentRadio" 
+                                         Content="腾讯翻译 (Tencent)" 
+                                         Style="{StaticResource ModernRadioButton}"
+                                         GroupName="Engine"
+                                         Checked="EngineRadio_Checked"
+                                         Margin="0,0,0,8"/>
+                            <RadioButton x:Name="GoogleRadio" 
+                                         Content="谷歌翻译 (Google)" 
+                                         Style="{StaticResource ModernRadioButton}"
+                                         GroupName="Engine"
+                                         Checked="EngineRadio_Checked"/>
+                        </StackPanel>
+                    </Border>
 
-        <!-- 语言设置部分 (核心新增) -->
-        <GroupBox Header="翻译语言设置" Grid.Row="2" Margin="0,10,0,0">
-            <Grid Margin="10">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" Text="源语言 (OCR): " VerticalAlignment="Center" Margin="0,0,5,0"/>
-                <ComboBox x:Name="SourceLanguageComboBox" Grid.Column="1" VerticalContentAlignment="Center"/>
+                    <!-- 百度翻译 API 配置 -->
+                    <Border x:Name="BaiduConfigPanel" Background="#F8F9FA" CornerRadius="8" Padding="20" Margin="0,0,0,16">
+                        <StackPanel>
+                            <TextBlock Text="🔑 百度翻译 API" 
+                                       FontSize="15" 
+                                       FontWeight="SemiBold" 
+                                       Foreground="#333333"
+                                       Margin="0,0,0,16"/>
+                            
+                            <TextBlock Text="App ID" FontSize="12" Foreground="#666666" Margin="0,0,0,6"/>
+                            <TextBox x:Name="BaiduAppIdTextBox" Style="{StaticResource ModernTextBox}" Margin="0,0,0,16"/>
+                            
+                            <TextBlock Text="Secret Key" FontSize="12" Foreground="#666666" Margin="0,0,0,6"/>
+                            <TextBox x:Name="BaiduSecretKeyTextBox" Style="{StaticResource ModernTextBox}"/>
+                        </StackPanel>
+                    </Border>
 
-                <TextBlock Grid.Column="2" Text="目标语言: " VerticalAlignment="Center" Margin="15,0,5,0"/>
-                <ComboBox x:Name="TargetLanguageComboBox" Grid.Column="3" VerticalContentAlignment="Center"/>
-            </Grid>
-        </GroupBox>
+                    <!-- 腾讯翻译 API 配置 -->
+                    <Border x:Name="TencentConfigPanel" Background="#F8F9FA" CornerRadius="8" Padding="20" Margin="0,0,0,16" Visibility="Collapsed">
+                        <StackPanel>
+                            <TextBlock Text="🔑 腾讯翻译 API" 
+                                       FontSize="15" 
+                                       FontWeight="SemiBold" 
+                                       Foreground="#333333"
+                                       Margin="0,0,0,16"/>
+                            
+                            <TextBlock Text="Secret ID" FontSize="12" Foreground="#666666" Margin="0,0,0,6"/>
+                            <TextBox x:Name="TencentSecretIdTextBox" Style="{StaticResource ModernTextBox}" Margin="0,0,0,16"/>
+                            
+                            <TextBlock Text="Secret Key" FontSize="12" Foreground="#666666" Margin="0,0,0,6"/>
+                            <TextBox x:Name="TencentSecretKeyTextBox" Style="{StaticResource ModernTextBox}"/>
+                        </StackPanel>
+                    </Border>
 
-        <TextBlock Grid.Row="3" Grid.ColumnSpan="2" Margin="0,15,0,0" TextWrapping="Wrap" Foreground="Gray">
-            提示：请前往百度翻译开放平台申请通用翻译个人密钥。
-        </TextBlock>
+                    <!-- 谷歌翻译 API 配置 -->
+                    <Border x:Name="GoogleConfigPanel" Background="#F8F9FA" CornerRadius="8" Padding="20" Margin="0,0,0,16" Visibility="Collapsed">
+                        <StackPanel>
+                            <TextBlock Text="🔑 谷歌翻译 API" 
+                                       FontSize="15" 
+                                       FontWeight="SemiBold" 
+                                       Foreground="#333333"
+                                       Margin="0,0,0,16"/>
+                            
+                            <TextBlock Text="API Key" FontSize="12" Foreground="#666666" Margin="0,0,0,6"/>
+                            <TextBox x:Name="GoogleApiKeyTextBox" Style="{StaticResource ModernTextBox}"/>
+                        </StackPanel>
+                    </Border>
 
-        <Button Grid.Row="5" Content="保存" HorizontalAlignment="Right" Width="80" Padding="5" Click="SaveButton_Click"/>
-    </Grid>
+                    <!-- 触发方式设置 -->
+                    <Border Background="#F8F9FA" CornerRadius="8" Padding="20" Margin="0,0,0,16">
+                        <StackPanel>
+                            <TextBlock Text="🖱️ 触发方式" 
+                                       FontSize="15" 
+                                       FontWeight="SemiBold" 
+                                       Foreground="#333333"
+                                       Margin="0,0,0,12"/>
+                            
+                            <RadioButton x:Name="MiddleMouseRadio" 
+                                         Content="按住鼠标中键拖动" 
+                                         Style="{StaticResource ModernRadioButton}"
+                                         GroupName="Trigger"
+                                         IsChecked="True"
+                                         Margin="0,0,0,8"/>
+                            <RadioButton x:Name="RightMouseRadio" 
+                                         Content="按住鼠标右键拖动" 
+                                         Style="{StaticResource ModernRadioButton}"
+                                         GroupName="Trigger"
+                                         Margin="0,0,0,8"/>
+                            <RadioButton x:Name="AltLeftMouseRadio" 
+                                         Content="按住 Alt + 鼠标左键拖动" 
+                                         Style="{StaticResource ModernRadioButton}"
+                                         GroupName="Trigger"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- 语言设置 -->
+                    <Border Background="#F8F9FA" CornerRadius="8" Padding="20" Margin="0,0,0,16">
+                        <StackPanel>
+                            <TextBlock Text="🌍 语言配置" 
+                                       FontSize="15" 
+                                       FontWeight="SemiBold" 
+                                       Foreground="#333333"
+                                       Margin="0,0,0,16"/>
+                            
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="16"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="源语言 (OCR)" FontSize="12" Foreground="#666666" Margin="0,0,0,6"/>
+                                    <ComboBox x:Name="SourceLanguageComboBox" Style="{StaticResource ModernComboBox}"/>
+                                </StackPanel>
+                                
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="目标语言" FontSize="12" Foreground="#666666" Margin="0,0,0,6"/>
+                                    <ComboBox x:Name="TargetLanguageComboBox" Style="{StaticResource ModernComboBox}"/>
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- 显示模式 -->
+                    <Border Background="#F8F9FA" CornerRadius="8" Padding="20" Margin="0,0,0,16">
+                        <StackPanel>
+                            <TextBlock Text="🎨 显示模式" 
+                                       FontSize="15" 
+                                       FontWeight="SemiBold" 
+                                       Foreground="#333333"
+                                       Margin="0,0,0,12"/>
+                            
+                            <RadioButton x:Name="LightThemeRadio" 
+                                         Content="浅色模式 ☀️" 
+                                         Style="{StaticResource ModernRadioButton}"
+                                         GroupName="Theme"
+                                         Margin="0,0,0,8"/>
+                            <RadioButton x:Name="DarkThemeRadio" 
+                                         Content="暗夜模式 🌙" 
+                                         Style="{StaticResource ModernRadioButton}"
+                                         GroupName="Theme" 
+                                         IsChecked="True"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- 提示信息 -->
+                    <Border Background="#FFF9E6" BorderBrush="#FFE4A3" BorderThickness="1" CornerRadius="8" Padding="16">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="💡" FontSize="16" VerticalAlignment="Top" Margin="0,0,8,0"/>
+                            <TextBlock TextWrapping="Wrap" 
+                                       FontSize="12" 
+                                       Foreground="#8B7500"
+                                       LineHeight="18">
+                                <Run Text="• 百度翻译："/>
+                                <Hyperlink NavigateUri="https://fanyi-api.baidu.com/" RequestNavigate="Hyperlink_RequestNavigate">
+                                    <Run Text="百度翻译开放平台"/>
+                                </Hyperlink>
+                                <LineBreak/>
+                                <Run Text="• 腾讯翻译："/>
+                                <Hyperlink NavigateUri="https://cloud.tencent.com/product/tmt" RequestNavigate="Hyperlink_RequestNavigate">
+                                    <Run Text="腾讯云机器翻译"/>
+                                </Hyperlink>
+                                <LineBreak/>
+                                <Run Text="• 谷歌翻译："/>
+                                <Hyperlink NavigateUri="https://cloud.google.com/translate" RequestNavigate="Hyperlink_RequestNavigate">
+                                    <Run Text="Google Cloud Translation API"/>
+                                </Hyperlink>
+                            </TextBlock>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- 底部按钮 -->
+            <Border Grid.Row="2" 
+                    Background="#F8F9FA" 
+                    CornerRadius="0,0,12,12" 
+                    Padding="24,16">
+                <Button Content="保存设置" 
+                        Style="{StaticResource PrimaryButton}"
+                        HorizontalAlignment="Right"
+                        Click="SaveButton_Click"/>
+            </Border>
+        </Grid>
+    </Border>
 </Window>
